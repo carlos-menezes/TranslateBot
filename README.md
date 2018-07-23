@@ -22,7 +22,7 @@ Any user can use the following command syntax to summon this bot: `@translate la
 ![Instructions](https://i.imgur.com/s45F0eZ.png)
 *The message containing the instructions.*
 
-To comply with bottiquette, I've added an option to (un)blacklist subreddits on the fly (and you can read about how that works [here](https://pastebin.com/MEDMa0Xp)).
+To comply with bottiquette, I've added an option to (un)blacklist subreddits on the fly (and you can read about how that works [here](https://pastebin.com/MEDMa0Xp)). This was a great opportunity to get some experience with databases.
 
 ![Blacklisted](https://i.imgur.com/Yp3irxH.png)
 ![Unblacklisted](https://i.imgur.com/0zJ3STJ.png)
