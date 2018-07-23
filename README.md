@@ -1,6 +1,8 @@
 # Translate Bot for Reddit
 A Reddit bot that translate a message when queried.
 
+**Why?** I try to work on something every day. This is something I've wanted to do for a while so I decided to dedicate some hours of my weekend to it.
+
 ---
 
 ## Getting Started
