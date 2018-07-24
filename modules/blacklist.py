@@ -1,7 +1,7 @@
 import praw
 from requests_html import HTMLSession
 
-url = "https://old.reddit.com/r/{}/about/moderators"
+url = 'https://old.reddit.com/r/{}/about/moderators'
 session = HTMLSession()
 
 def get_mod_list(sub):
