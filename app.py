@@ -25,10 +25,8 @@ inbox_stream = praw.models.util.stream_generator(reddit.inbox.unread, pause_afte
 # Defines
 executed_timestamp = time.time() # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comments everytime it is executed.
 
-blacklisted = c.execute('SELECT * from Blacklist').fetchall()
-blacklisted_subs = [row[0] for row in blacklisted]
-
-lang_list = list(chain(*c.execute('SELECT * from CountryCodes').fetchall()))
+blacklisted_subs = set(chain(*c.execute('SELECT * from Blacklist').fetchall()))
+lang_list = set(chain(*c.execute('SELECT * from CountryCodes').fetchall()))
 
 
 def main():
@@ -48,14 +46,14 @@ def main():
 
                                 try:
                                     lang, query = comment_match.groups()
-                                    codes = [row[0] for row in lang_list]
+                                    lang = lang.lower()
 
-                                    if str(lang) not in codes: # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
+                                    if lang not in lang_list: # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
                                         reddit.redditor(author).message('Notification from TranslateService', syntax_message(author))
 
                                     else:
                                         result = translate(f'{lang}', f'{query}')
-                                        message = f"""**Original text:** {str(query)}
+                                        message = f"""**Original text:** {query}
     
     
         **Translated text ({result['lang']}):** {result['text'][0]}
@@ -82,7 +80,7 @@ def main():
 
                         if msg.author in mods:
                             if sub_name not in blacklisted_subs:
-                                blacklisted_subs.append(sub_name)
+                                blacklisted_subs.add(sub_name)
                                 c.execute('INSERT INTO Blacklist(SubName) VALUES (?)', (sub_name,))
                                 conn.commit()
 
