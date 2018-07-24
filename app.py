@@ -26,10 +26,8 @@ main_trigger = '@translate' # Bot replies to comment with this keyword.
 executed_timestamp = time.time() # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comments everytime it is executed.
 
 blacklisted = c.execute('SELECT * from Blacklist').fetchall()
-blacklisted_subs = []
+blacklisted_subs = [row[0] for row in blacklisted]
 
-for row in blacklisted:
-    blacklisted_subs.append(row[0])
 
 while True:
     try:
@@ -55,18 +53,13 @@ while True:
                                 query = pattern.group(2) # pattern({2})
 
                                 lang_list = c.execute('SELECT * from CountryCodes').fetchall()
-                                codes = []
-
-                                for row in lang_list:
-                                    codes.append(row[0])
-                                
+                                codes = [row[0] for row in lang_list]
 
                                 if str(lang) not in codes: # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
                                     reddit.redditor(author).message('Notification from TranslateService', syntax_message(author))
 
                                 else:
                                     result = translate(f'{lang}', f'{query}')
-
                                     message = f"""**Original text:** {str(query)}
 
 
