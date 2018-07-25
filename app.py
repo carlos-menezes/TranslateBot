@@ -29,7 +29,6 @@ class TranslateBot:
         url = f'https://old.reddit.com/r/{sub_name}/about/moderators'
         session = HTMLSession()
         mods = set()
-
         response = None
         while response is None:
             try:
@@ -48,18 +47,15 @@ class TranslateBot:
         for comment in self.comment_stream:
             if comment is None:
                 break
-
             if comment.created_utc > self.executed_timestamp:
                 if comment.subreddit not in self.database.blacklisted_subs:
                     if comment.body.startswith(patterns.main_trigger):
                         if comment.parent_id == comment.link_id:
                             author = str(comment.author)
                             comment_match = re.match(patterns.full_trigger_pattern, comment.body)
-
                             try:
                                 lang, query = comment_match.groups()
                                 lang = lang.lower()
-
                                 if lang in self.database.valid_langs:
                                     translation_response = translate.translate(f'{lang}', f'{query}')
                                     print(f'replying to: {author}')
@@ -79,13 +75,11 @@ class TranslateBot:
         for msg in self.inbox_stream:
             if msg is None:
                 break
-
             if msg.created_utc > self.executed_timestamp:
                 msg_author = str(msg.author)
                 msg_subject = msg.subject.lower()
                 sub_name = msg.body.lower()
                 sub_mods = self.get_moderator_set(sub_name)
-
                 if msg_author in sub_mods:
                     if msg_subject == 'blacklist':
                         if sub_name not in self.database.blacklisted_subs:
@@ -93,7 +87,6 @@ class TranslateBot:
                             print(f'sending blacklist add message to: {msg_author}')
                             self.reddit.redditor(msg_author).message('Notification from TranslateService',
                                                                       messages.blacklist_action(msg_author, sub_name, 'blacklisted'))
-
                     elif msg_subject == 'unblacklist':
                         if sub_name in self.database.blacklisted_subs:
                             self.database.remove_from_blacklist(sub_name)
