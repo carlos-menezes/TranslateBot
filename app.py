@@ -19,7 +19,7 @@ class TranslateBot:
         # Authenticating with Reddit
         self.reddit = praw.Reddit('translate_bot')
         # Stream of comments
-        self.comment_stream = self.reddit.subreddit('testingground4bots').stream.comments(pause_after=-1)
+        self.comment_stream = self.reddit.subreddit('all').stream.comments(pause_after=-1)
         # Stream of inbox messages
         self.inbox_stream = praw.models.util.stream_generator(self.reddit.inbox.unread, pause_after=-1)
         # Start
@@ -68,6 +68,7 @@ class TranslateBot:
                             # If the message does not match the pattern, send a syntax message to the user.
                             except AttributeError as e:
                                 print(e)
+                                print(f'sending syntax error message to: {author}')
                                 self.reddit.redditor(author).message('Notification from TranslateService',
                                                                      messages.syntax_error(author))
 
@@ -95,6 +96,7 @@ class TranslateBot:
                                                                      messages.blacklist_action(msg_author, sub_name, 'unblacklisted'))
 
     def main(self):
+        print('Started.')
         while True:
             try:
                 self.read_messages()
