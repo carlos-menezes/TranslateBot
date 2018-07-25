@@ -1,4 +1,6 @@
 import praw
+from praw.exceptions import APIException, ClientException
+from prawcore.exceptions import PrawcoreException
 import re
 import requests
 from requests_html import HTMLSession
@@ -60,16 +62,18 @@ class TranslateBot:
 
                                 if lang in self.database.valid_langs:
                                     translation_response = translate.translate(f'{lang}', f'{query}')
+                                    print(f'replying to: {author}')
                                     comment.reply(messages.translated_comment(query, **translation_response))
                                 # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
                                 else:
+                                    print(f'sending syntax error message to: {author}')
                                     self.reddit.redditor(author).message('Notification from TranslateService',
-                                                                    messages.syntax_error(author))
+                                                                         messages.syntax_error(author))
                             # If the message does not match the pattern, send a syntax message to the user.
                             except AttributeError as e:
                                 print(e)
                                 self.reddit.redditor(author).message('Notification from TranslateService',
-                                                                messages.syntax_error(author))
+                                                                     messages.syntax_error(author))
 
     def read_messages(self):
         for msg in self.inbox_stream:
@@ -86,12 +90,14 @@ class TranslateBot:
                     if msg_subject == 'blacklist':
                         if sub_name not in self.database.blacklisted_subs:
                             self.database.add_to_blacklist(sub_name)
+                            print(f'sending blacklist add message to: {msg_author}')
                             self.reddit.redditor(msg_author).message('Notification from TranslateService',
                                                                       messages.blacklist_action(msg_author, sub_name, 'blacklisted'))
 
                     elif msg_subject == 'unblacklist':
                         if sub_name in self.database.blacklisted_subs:
                             self.database.remove_from_blacklist(sub_name)
+                            print(f'sending blacklist remove message to: {msg_author}')
                             self.reddit.redditor(msg_author).message('Notification from TranslateService',
                                                                      messages.blacklist_action(msg_author, sub_name, 'unblacklisted'))
 
@@ -100,7 +106,8 @@ class TranslateBot:
             try:
                 self.read_messages()
                 self.read_comments()
-            except Exception as e:
+            except (APIException, ClientException, PrawcoreException) as e:
+                print(e)
                 pass
 
 
