@@ -22,7 +22,7 @@ comment_stream = reddit.subreddit('all').stream.comments(pause_after=-1)
 inbox_stream = praw.models.util.stream_generator(reddit.inbox.unread, pause_after=-1)
 
 # Defines
-executed_timestamp = time.time() # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comment_stream everytime it is executed.
+executed_timestamp = time.time() # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comment every time it is executed.
 
 blacklisted_subs = set(chain(*c.execute('SELECT * from Blacklist').fetchall()))
 valid_langs = set(chain(*c.execute('SELECT * from CountryCodes').fetchall()))
