@@ -1,11 +1,17 @@
 from modules.parseconfig import yandex_api
 import requests
+from time import sleep
 
 def translate(lang, text):
-    url = f'https://translate.yandex.net/api/v1.5/tr.json/translate?key={str(yandex_api)}&lang={lang}&text={text}&format=plain'
+    url = f'https://translate.yandex.net/api/v1.5/tr.json/translate?key={yandex_api}&lang={lang}&text={text}&format=plain'
 
-    r = requests.get(url)
-
-    if r.status_code == 200:
-        r = r.json()
-        return r
+    response = None
+    while response is None:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            if response.status_code == 200:
+        except (requests.exceptions.HTTPError, ConnectionError) as exc:
+            print(exc)
+            sleep(5)
+    return response.json()
