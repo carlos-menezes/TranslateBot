@@ -1,89 +1,108 @@
-from itertools import chain
 import praw
 import re
-import sqlite3
+import requests
+from requests_html import HTMLSession
 import time
 from modules import patterns
-import modules.blacklist as blacklist
+from modules.database import Database
 import modules.messages as messages
 import modules.translate as translate
 
 
-conn = sqlite3.connect('bot.db')
-c = conn.cursor()
+class TranslateBot:
+    def __init__(self):
+        # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comment every time it is executed.
+        self.executed_timestamp = time.time()
+        self.database = Database()
+        # Authenticating with Reddit
+        self.reddit = praw.Reddit('translate_bot')
+        # Stream of comments
+        self.comment_stream = self.reddit.subreddit('testingground4bots').stream.comments(pause_after=-1)
+        # Stream of inbox messages
+        self.inbox_stream = praw.models.util.stream_generator(self.reddit.inbox.unread, pause_after=-1)
+        # Start
+        self.main()
 
-# Authenticating with Reddit
-reddit = praw.Reddit('translate_bot')
+    def get_moderator_set(self, sub_name):
+        url = f'https://old.reddit.com/r/{sub_name}/about/moderators'
+        session = HTMLSession()
+        mods = set()
 
-# Stream of comments
-comment_stream = reddit.subreddit('all').stream.comments(pause_after=-1)
+        response = None
+        while response is None:
+            try:
+                response = session.get(url)
+                response.raise_for_status()
+                users = response.html.find('span.user')
+                for user in users[1:]:
+                    mod = user.text.split('\xa0')[0]
+                    mods.add(mod)
+            except (requests.exceptions.HTTPError, ConnectionError) as exc:
+                print(exc)
+                time.sleep(5)
+        return mods
 
-# Stream of inbox messages
-inbox_stream = praw.models.util.stream_generator(reddit.inbox.unread, pause_after=-1)
+    def read_comments(self):
+        for comment in self.comment_stream:
+            if comment is None:
+                break
 
-# Defines
-executed_timestamp = time.time() # Stores the current time in seconds since the Epoch. Used later to prevent the bot from replying to old comment every time it is executed.
+            if comment.created_utc > self.executed_timestamp:
+                if comment.subreddit not in self.database.blacklisted_subs:
+                    if comment.body.startswith(patterns.main_trigger):
+                        if comment.parent_id == comment.link_id:
+                            author = str(comment.author)
+                            comment_match = re.match(patterns.full_trigger_pattern, comment.body)
 
-blacklisted_subs = set(chain(*c.execute('SELECT * from Blacklist').fetchall()))
-valid_langs = set(chain(*c.execute('SELECT * from CountryCodes').fetchall()))
+                            try:
+                                lang, query = comment_match.groups()
+                                lang = lang.lower()
 
+                                if lang in self.database.valid_langs:
+                                    translation_response = translate.translate(f'{lang}', f'{query}')
+                                    comment.reply(messages.translated_comment(query, **translation_response))
+                                # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
+                                else:
+                                    self.reddit.redditor(author).message('Notification from TranslateService',
+                                                                    messages.syntax_error(author))
+                            # If the message does not match the pattern, send a syntax message to the user.
+                            except AttributeError as e:
+                                print(e)
+                                self.reddit.redditor(author).message('Notification from TranslateService',
+                                                                messages.syntax_error(author))
 
-def main():
-    while True:
-        try:
-            for comment in comment_stream:
-                if comment is None:
-                    break
+    def read_messages(self):
+        for msg in self.inbox_stream:
+            if msg is None:
+                break
 
-                if comment.created_utc > executed_timestamp:
-                    if comment.subreddit not in blacklisted_subs:
-                        if comment.body.startswith(patterns.main_trigger):
-                            if comment.parent_id == comment.link_id:
-                                author = str(comment.author)
+            if msg.created_utc > self.executed_timestamp:
+                msg_author = str(msg.author)
+                msg_subject = msg.subject.lower()
+                sub_name = msg.body.lower()
+                sub_mods = self.get_moderator_set(sub_name)
 
-                                comment_match = re.match(patterns.full_trigger_pattern, comment.body)
+                if msg_author in sub_mods:
+                    if msg_subject == 'blacklist':
+                        if sub_name not in self.database.blacklisted_subs:
+                            self.database.add_to_blacklist(sub_name)
+                            self.reddit.redditor(msg_author).message('Notification from TranslateService',
+                                                                      messages.blacklist_action(msg_author, sub_name, 'blacklisted'))
 
-                                try:
-                                    lang, query = comment_match.groups()
-                                    lang = lang.lower()
+                    elif msg_subject == 'unblacklist':
+                        if sub_name in self.database.blacklisted_subs:
+                            self.database.remove_from_blacklist(sub_name)
+                            self.reddit.redditor(msg_author).message('Notification from TranslateService',
+                                                                     messages.blacklist_action(msg_author, sub_name, 'unblacklisted'))
 
-                                    if lang in valid_langs:
-                                        translation_response = translate.translate(f'{lang}', f'{query}')
-                                        comment.reply(messages.translated_comment(query, **translation_response))
-                                    # If the parameters passed to "lang" is not recognized by Yandex, send a message to the user notifying him.
-                                    else:
-                                        reddit.redditor(author).message('Notification from TranslateService', messages.syntax_error(author))
-                                # If the message does not match the pattern, send a syntax message to the user.
-                                except AttributeError as e:
-                                    print(e)
-                                    reddit.redditor(author).message('Notification from TranslateService', messages.syntax_error(author))
-
-            for msg in inbox_stream:
-                if msg is None:
-                    break
-
-                if msg.created_utc > executed_timestamp:
-                    msg_author = str(msg.author)
-                    msg_subject = msg.subject.lower()
-                    sub_name = msg.body.lower()
-                    sub_mods = blacklist.get_moderator_set(sub_name)
-
-                    if msg_author in sub_mods:
-                        if msg_subject == 'blacklist':
-                            if sub_name not in blacklisted_subs:
-                                blacklisted_subs.add(sub_name)
-                                blacklist.add_to_blacklist(sub_name=sub_name, sql_connection=conn, sql_cursor=c)
-                                reddit.redditor(msg_author).message('Notification from TranslateService',
-                                                                    messages.blacklist_action(msg_author, sub_name, 'blacklisted'))
-                        elif msg_subject == 'unblacklist':
-                            if sub_name in blacklisted_subs:
-                                blacklisted_subs.remove(sub_name)
-                                blacklist.remove_from_blacklist(sub_name=sub_name, sql_connection=conn, sql_cursor=c)
-                                reddit.redditor(msg_author).message('Notification from TranslateService',
-                                                                    messages.blacklist_action(msg_author, sub_name, 'unblacklisted'))
-        except Exception as e:
-            continue
+    def main(self):
+        while True:
+            try:
+                self.read_messages()
+                self.read_comments()
+            except Exception as e:
+                pass
 
 
 if __name__ == '__main__':
-    main()
+    TranslateBot()
