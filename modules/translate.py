@@ -10,7 +10,6 @@ def translate(lang, text):
         try:
             response = requests.get(url)
             response.raise_for_status()
-            if response.status_code == 200:
         except (requests.exceptions.HTTPError, ConnectionError) as exc:
             print(exc)
             sleep(5)
